@@ -1,0 +1,9 @@
+This was solved by brute force with a little optimization.
+It's a very long time! The task can be solved much faster. 
+After cycles are found in all paths, the task is reduced to an analytical one, if you think about it.
+
+---
+
+Это было решено методом перебора с небольшой оптимизацией.
+Это очень долго! Задачу можно решить намного быстрее. 
+После того, как найдены циклы во всех путях, задача сводится к аналитической, если подумать.

@@ -28,6 +28,98 @@ func encode(b []byte) uint16 {
 	return v
 }
 
+var (
+	start  = encode([]byte("AAA")) % modulo // ??A
+	finish = encode([]byte("ZZZ")) % modulo // ??Z
+)
+
+type Position struct {
+	node  uint16
+	i     uint16
+	count int
+	next  *Position
+}
+
+type Way struct {
+	instructions []byte
+	nodes        [][2]uint16
+	count        int
+	pos          *Position
+	hash         map[[2]uint16]*Position
+}
+
+func NewWay(instructions []byte, nodes [][2]uint16, start uint16) *Way {
+	w := &Way{
+		instructions: instructions,
+		nodes:        nodes,
+		hash:         map[[2]uint16]*Position{},
+	}
+	w.first(start)
+	return w
+}
+
+func (w *Way) first(start uint16) {
+	node, i, count := w.searchNext(start, 0)
+
+	w.count = count
+	w.pos = &Position{node: node, i: i}
+
+	key := [2]uint16{node, i}
+	w.hash[key] = w.pos
+}
+
+func (w *Way) searchNext(node uint16, i uint16) (uint16, uint16, int) {
+	count := 0
+
+	for node%modulo != finish {
+		step := w.instructions[i]
+		i++
+		if int(i) == len(w.instructions) {
+			i = 0
+		}
+		node = w.nodes[node][step]
+		count++
+	}
+
+	return node, i, count
+}
+
+func (w *Way) Next(count int) int {
+	for w.count < count {
+		pos := w.pos
+
+		if pos.next != nil {
+			w.count += pos.count
+			w.pos = pos.next
+			continue
+		}
+
+		i := pos.i
+		step := w.instructions[pos.i]
+		i++
+		if int(i) == len(w.instructions) {
+			i = 0
+		}
+		node := w.nodes[pos.node][step]
+
+		node, i, count := w.searchNext(node, i)
+		count++
+		pos.count = count
+		w.count += count
+
+		key := [2]uint16{node, i}
+		nextPos := w.hash[key]
+		if nextPos == nil {
+			nextPos = &Position{node: node, i: i, count: count}
+		}
+
+		pos.next = nextPos
+		w.pos = nextPos
+	}
+
+	return w.count
+}
+
 func _run(scan *Scanner, bw *bufio.Writer) error {
 	scan.Scan()
 	instructions := make([]byte, len(scan.Bytes()))
@@ -41,7 +133,6 @@ func _run(scan *Scanner, bw *bufio.Writer) error {
 	nodes := make([][2]uint16, modulo*modulo*modulo)
 
 	var starts []uint16
-	start := encode([]byte("AAA")) % modulo // ??A
 
 	for scan.Scan() {
 		node := encode(scan.Bytes())
@@ -65,34 +156,50 @@ func _run(scan *Scanner, bw *bufio.Writer) error {
 		log.Println("starts:", starts)
 	}
 
-	finish := encode([]byte("ZZZ")) % modulo // ??Z
-	count := 0
-	i := 0
+	bingo := true
 
-	isFinish := func() bool {
-		for _, start := range starts {
-			if start%modulo != finish {
-				return false
-			}
+	count := 0
+	ways := make([]*Way, len(starts))
+	for i, start := range starts {
+		w := NewWay(
+			instructions,
+			nodes,
+			start,
+		)
+		if count != w.count {
+			count = w.count
+			bingo = false
 		}
-		return true
+		ways[i] = w
 	}
 
-	for !isFinish() {
-		step := instructions[i]
-		if i++; i == len(instructions) {
-			i = 0
-		}
 
-		for i, start := range starts {
-			starts[i] = nodes[start][step]
+	for !bingo {
+		if debugEnable {
+			log.Println("count:", count)
 		}
-
-		count++
+			bingo = true
+		for _, w := range ways {
+			w.Next(count)
+			if count != w.count {
+				if debugEnable {
+					log.Println("count:", w.count)
+				}
+				count = max(count, w.count)
+				bingo = false
+			}
+		}
 	}
 
 	fmt.Fprintln(bw, count)
 	return nil
+}
+
+func max(a, b int) int {
+	if a < b {
+		return b
+	}
+	return a
 }
 
 func run(r io.Reader, w io.Writer) (err error) {
