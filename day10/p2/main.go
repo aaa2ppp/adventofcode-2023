@@ -1,6 +1,7 @@
 package main
 
 import (
+	"adventofcode-2023/lib/queue"
 	"bufio"
 	"bytes"
 	"fmt"
@@ -100,23 +101,24 @@ type Way struct {
 	fromDir Point
 }
 
-func doStep(plane [][]byte, way Way) (Way, bool) {
+func doStep(plane [][]byte, matrix [][]byte, way Way) (Way, bool) {
 	toDir, ok := getToDir(plane[way.point.i][way.point.j], way.fromDir)
 	if ok {
+		drawStep(matrix, way.point, toDir)
 		way.point = way.point.Add(toDir)
 		way.fromDir = Point{-1 * toDir.i, -1 * toDir.j}
 	}
 	return way, false
 }
 
-func searchForBeast(plane [][]byte) int {
+func draw(plane [][]byte) [][]byte {
 	n := len(plane)
 	m := len(plane[0])
 
 	start := getStart(plane)
-	if debugEnable {
-		log.Println("start:", start)
-	}
+
+	matrix := makeMatrix(n, m)
+	drawPoint(matrix, start)
 
 	way := [2]Way{}
 
@@ -130,36 +132,94 @@ func searchForBeast(plane [][]byte) int {
 		if p := start.Add(toDir); p.Valid(n, m) {
 			c := plane[p.i][p.j]
 			if _, ok := getToDir(c, fromDir); ok {
+				drawStep(matrix, start, toDir)
 				way[k] = Way{fromDir: fromDir, point: p}
 				k++
 			}
 		}
 	}
 
-	if k != 2 {
+	if k != 2 { // XXX
 		panic("not found ways from start")
 	}
 
 	count := 1
-	for way[0].point != way[1].point && count < n*m/2 {
-		if debugEnable {
-			log.Printf("%d: %v %v", count, way[0], way[1])
-		}
-		way[0], _ = doStep(plane, way[0])
-		way[1], _ = doStep(plane, way[1])
+	for way[0].point != way[1].point && count < n*m/2 { // XXX avoid endless loop
+		way[0], _ = doStep(plane, matrix, way[0])
+		way[1], _ = doStep(plane, matrix, way[1])
 		count++
 	}
 
-	return count
+	return matrix
 }
 
-func makeMatrix(n, m int) [][]int {
-	buf := make([]int, n*m)
-	matrix := make([][]int, n)
+func makeMatrix(n, m int) [][]byte {
+	n = n*2+1
+	m = m*2+1
+	buf := make([]byte, n*m)
+	for i := range buf {
+		buf[i] = '.'
+	}
+	matrix := make([][]byte, n)
 	for i, j := 0, 0; i < n; i, j = i+1, j+m {
 		matrix[i] = buf[j : j+m]
 	}
 	return matrix
+}
+
+func drawPoint(matrix [][]byte, p Point) {
+	i := p.i*2+1
+	j := p.j*2+1
+	matrix[i][j] = 'X'
+}
+
+func drawStep(matrix [][]byte, from, toDir Point) {
+	i := from.i*2+1
+	j := from.j*2+1
+	for k := 1; k <= 2; k++ {
+		i += toDir.i
+		j += toDir.j
+		matrix[i][j] = 'X'
+	}
+}
+
+func fill(matrix [][]byte) {
+	n := len(matrix)
+	m := len(matrix[0])
+	p := Point{} 
+	dirs := []Point{North, South, West, East}
+
+	matrix[p.i][p.j] = 'X'
+	var frontier queue.Queue[Point]
+	frontier.Push(p)
+
+	for frontier.Size() > 0 {
+		p := frontier.Pop()
+
+		for _, toDir := range dirs {
+			neig := p.Add(toDir)
+			if neig.Valid(n, m) && matrix[neig.i][neig.j] == '.' {
+				matrix[neig.i][neig.j] = 'X'
+				frontier.Push(neig)
+			}
+		}
+	}
+}
+
+func calc(matrix [][]byte) int {
+	n := len(matrix)
+	m := len(matrix[0])
+	count := 0
+
+	for i := 1; i < n; i+=2 {
+		for j := 1; j < m; j+=2 {
+			if matrix[i][j] == '.' {
+				count++
+			}
+		}
+	}
+
+	return count
 }
 
 func _run(br *bufio.Reader, bw *bufio.Writer) error {
@@ -168,7 +228,25 @@ func _run(br *bufio.Reader, bw *bufio.Writer) error {
 		return err
 	}
 
-	count := searchForBeast(plane)
+	matrix := draw(plane)
+
+	if debugEnable {
+		log.Println("draw plane:")
+		for _, row := range matrix {
+			log.Printf("%s\n", row)
+		}
+	}
+
+	fill(matrix)
+
+	if debugEnable {
+		log.Println("fill outside:")
+		for _, row := range matrix {
+			log.Printf("%s\n", row)
+		}
+	}
+
+	count := calc(matrix)
 
 	fmt.Fprintln(bw, count)
 	return nil
