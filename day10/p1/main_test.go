@@ -1,0 +1,81 @@
+package main
+
+import (
+	"bytes"
+	"io"
+	"strings"
+	"testing"
+)
+
+func Test_run(t *testing.T) {
+	type args struct {
+		r io.Reader
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantW   string
+		wantErr bool
+		debug   bool
+	}{
+		{
+			"1",
+			args{strings.NewReader(`.....
+.S-7.
+.|.|.
+.L-J.
+.....`)},
+			`4`,
+			false,
+			true,
+		},
+		{
+			"1.2",
+			args{strings.NewReader(`-L|F7
+7S-7|
+L|7||
+-L-J|
+L|-JF`)},
+			`4`,
+			false,
+			true,
+		},
+		{
+			"2",
+			args{strings.NewReader(`..F7.
+.FJ|.
+SJ.L7
+|F--J
+LJ...`)},
+			`8`,
+			false,
+			true,
+		},
+		{
+			"2.2",
+			args{strings.NewReader(`7-F7-
+.FJ|7
+SJLL7
+|F--J
+LJ.LJ`)},
+			`8`,
+			false,
+			true,
+		},
+		// TODO: Add test cases.
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			debugEnable = tt.debug
+			defer func() { debugEnable = false }()
+			w := &bytes.Buffer{}
+			if err := run(tt.args.r, w); (err != nil) != tt.wantErr {
+				t.Errorf("run() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if gotW := w.String(); strings.TrimSpace(gotW) != strings.TrimSpace(tt.wantW) {
+				t.Errorf("run() = %v, want %v", gotW, tt.wantW)
+			}
+		})
+	}
+}
