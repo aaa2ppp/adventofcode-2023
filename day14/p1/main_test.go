@@ -34,13 +34,22 @@ func Test_run(t *testing.T) {
 			false,
 			true,
 		},
-		// {
-		// 	"2",
-		// 	args{strings.NewReader(``)},
-		// 	``,
-		// 	false,
-		// 	true,
-		// },
+		{
+			"2",
+			args{strings.NewReader(`.....#....
+			....#...O#
+			.....##...
+			..O#......
+			.....OOO#.
+			.O#...O#.#
+			....O#...O
+			.......OOO
+			#...O###.O
+			#.OOO#...O`)},
+			`110`,
+			false,
+			true,
+		},
 		// {
 		// 	"3",
 		// 	args{strings.NewReader(``)},
